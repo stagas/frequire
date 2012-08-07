@@ -1,0 +1,7 @@
+{
+  "name": "jquery-component",
+  "version": "1.7.3pre",
+  "description": "jQuery component",
+  "keywords": ["jquery", "component"],
+  "scripts": ["index.js"]
+}

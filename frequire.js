@@ -1,29 +1,67 @@
 var fs = require('fs')
 var path = require('path')
+var exists = fs.existsSync || path.existsSync
 var extname = path.extname
+var dirname = path.dirname
+var normalize = path.normalize
 var toSource = require('tosource')
 
-var requireManager = fs.readFileSync(__dirname + '/require.js')
+var requireManager = read(__dirname + '/require.js')
 
-module.exports = function (_require) {
+module.exports = function (_require, skipPackageJson) {
   var wrapped = requireManager
+
   return {
-    require: function (name, thing) {
-      var regName = name
+    require: function __require (name, thing, resolver, skipFiles) {
+      var registryName = name
+      resolver = resolver || _require.resolve
+
+      // passing path
       if ('string' === typeof thing) name = thing
-      else if (thing !== undefined) {
+
+      // passing code
+      else if (null != thing) {
         wrapped += wrap(name, 'module.exports = ' + toSource(thing))
         return this
       }
-      var filename = _require.resolve(name)
-      var script = fs.readFileSync(filename, 'utf8')
+
+      var filename = resolver(name)
       var ext = extname(filename.toLowerCase())
+
+      var script = read(filename)
+
+      // bundle package.files
+      if (!skipFiles) {
+        var pkg = readPackageJson(filename) || {}
+
+        function requireChildren (files) {
+          if (!Array.isArray(files)) files = Object.keys(files).map(function (el) { return files[el] })
+          for (var i = files.length; i--;) {
+            __require(
+              name + '/' + files[i]
+            , files[i]
+            , function (x) { return resolver(name + '/' + x) }
+            , true
+            )
+          }
+        }
+
+        if (pkg.files) requireChildren(pkg.files)
+        if (pkg.component) {
+          if (pkg.component.styles) requireChildren(pkg.component.styles)
+          if (pkg.component.templates) requireChildren(pkg.component.templates)
+        }
+      }
+
       if ('.js' === ext) {}
       else if ('.json' === ext) script = 'module.exports = ' + script
       else script = 'module.exports = "' + script.replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, '\\n') + '"'
-      wrapped += wrap(regName, script)
+
+      wrapped += wrap(registryName, script)
+
       return this
     }
+
   , expose: function (name, thing) {
       if ('function' === typeof name) {
         wrapped += '\n;(' + name + ')();\n'
@@ -31,6 +69,7 @@ module.exports = function (_require) {
       else wrapped += '\nwindow["' + name + '"] = ' + toSource(thing) + ';\n'
       return this
     }
+
   , middleware: function (opts) {
       if ('string' === typeof opts) opts = { pathname: opts }
       opts = opts || { pathname: '/wrapped.js' }
@@ -44,6 +83,33 @@ module.exports = function (_require) {
       }
     }
   }
+}
+
+function read (filename) {
+  return fs.readFileSync(normalize(filename), 'utf8')
+}
+
+// modified from vesln/package
+function readPackageJson (filename) {
+  var location = dirname(filename)
+  var found = null
+  var pkg = {}
+
+  while (!found) {
+    if (exists(location + '/package.json')) {
+      found = location
+    } else if (location !== '/' && location.substr(1) !== ':\\') {
+      location = dirname(location)
+    } else {
+      break
+    }
+  }
+
+  if (found) {
+    pkg = JSON.parse(read(found + '/package.json'))
+  }
+
+  return pkg
 }
 
 function wrap (name, script) {

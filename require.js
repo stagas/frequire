@@ -10,6 +10,7 @@
 function require(p, parent){
   var path = require.resolve(p)
     , mod = require.modules[path];
+  console.log(path, mod)
   if (!mod) throw new Error('failed to require "' + p + '" in ' + (parent || 'root'));
   if (!mod.exports) {
     mod.exports = {};
@@ -90,11 +91,12 @@ require.exec = function (path, fn) {
 require.relative = function(parent) {
   function fn(p){
     if ('.' != p[0]) return require(p, parent);
-    
+
     var path = parent.split('/')
       , segs = p.split('/');
-    path.pop();
-    
+
+    if ('.' == path[0][0]) path.pop();
+
     for (var i = 0; i < segs.length; i++) {
       var seg = segs[i];
       if ('..' == seg) path.pop();
