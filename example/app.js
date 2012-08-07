@@ -17,14 +17,29 @@ f.require('deep')
  // Woo, just send some code to be required!
 f.require('multiply', function (a, b) { return a*b })
 
+// JSON files also
+f.require('./config')
+
+// Anything else will be returned as a string
+f.require('./snippet.html')
+f.require('./style.css')
+
 // Just pollute the window global
 f.expose('start', function () {
   var foo = require('./foo')
   var mul = require('multiply')
   var deep = require('deep')
+  var snippet = require('./snippet.html')
+  var style = require('./style.css')
+  var config = require('./config')
   foo()
   console.log(mul(5, 5))
   console.log(deep())
+  document.write(snippet)
+  var css = document.createElement('style')
+  css.innerHTML = style
+  document.head.appendChild(css)
+  alert(config.welcome)
 })
 
 // Expose a function to be self-executed

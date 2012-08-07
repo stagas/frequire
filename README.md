@@ -12,7 +12,9 @@ var f = require('frequire')(require)
 
 ### f.require(moduleName [, modulePath OR code ])
 
-Loads and registers a module file, or pass some code to be required (it will be wrapped like: `module.exports = code`)
+Loads and registers a module file, or pass some code to be required (it will be wrapped like: `module.exports = code`).
+
+You can also require JSON files. Any other types will be returned as Strings (for example you could require an html document, a css file, etc).
 
 ### f.expose('some', code)
 

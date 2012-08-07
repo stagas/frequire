@@ -1,4 +1,6 @@
 var fs = require('fs')
+var path = require('path')
+var extname = path.extname
 var toSource = require('tosource')
 
 var requireManager = fs.readFileSync(__dirname + '/require.js')
@@ -13,7 +15,12 @@ module.exports = function (_require) {
         wrapped += wrap(name, 'module.exports = ' + toSource(thing))
         return this
       }
-      var script = fs.readFileSync(_require.resolve(name), 'utf8')
+      var filename = _require.resolve(name)
+      var script = fs.readFileSync(filename, 'utf8')
+      var ext = extname(filename.toLowerCase())
+      if ('.js' === ext) {}
+      else if ('.json' === ext) script = 'module.exports = ' + script
+      else script = 'module.exports = "' + script.replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, '\\n') + '"'
       wrapped += wrap(regName, script)
       return this
     }
