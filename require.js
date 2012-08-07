@@ -10,7 +10,6 @@
 function require(p, parent){
   var path = require.resolve(p)
     , mod = require.modules[path];
-  console.log(path, mod)
   if (!mod) throw new Error('failed to require "' + p + '" in ' + (parent || 'root'));
   if (!mod.exports) {
     mod.exports = {};

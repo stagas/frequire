@@ -1,38 +1,82 @@
 # frequire
 
-Just f**ing require modules and share code with the browser.
+Just f**ing require modules and components and share code with the browser.
 
-### See example app
+### Also see the [example](https://github.com/stagas/frequire/blob/master/example/app.js)
 
-## API / Usage
+## Example
+
+#### server:
 
 ```javascript
 var f = require('frequire')(require)
+f.require('jquery')
+app.use(f.middleware())
 ```
 
-### f.require(moduleName [, modulePath OR code ])
+#### index.html
 
-Loads and registers a module file, or pass some code to be required (it will be wrapped like: `module.exports = code`).
+Simply insert these in `<head>`:
+```html
+  <link rel="stylesheet" href="/wrapped.css">
+  <script src="/wrapped.js"></script>
+```
 
-You can also require JSON files. Any other types will be returned as Strings (for example you could require an html document, a css file, etc).
+Then in your client code:
 
-### f.expose('some', code)
+```html
+var $ = require('jquery')
+```
+
+## API
+
+#### f.require('module')
+
+Load and register a module to be required.
+
+#### f.require('module', './path/to/module')
+
+Load a module from path, and register it with another name.
+
+#### f.require(['emitter', 'jquery', 'tip'])
+
+Mass register modules.
+
+#### f.require([ 'x', ['y', './path/to/y'] ])
+
+Combinations.
+
+#### f.require('fn', function () { return 'woo!' })
+
+Pass a function to be sourced out.
+
+#### f.require('system', { os: 'amigaos3.1', reset: function () { return 'Ctrl+Amiga+Amiga' } })
+
+Or an object.
+
+### More
+
+You can also require JSON files.
+
+Any other types will be returned as Strings (for example you could require an html document, a css file, etc).
+
+#### f.expose('some', code)
 
 Inserts `window['some'] = code`
 
-### f.expose(fn)
+#### f.expose(fn)
 
 Wraps and executes function: `(fn)()`
 
-### f.middleware(options OR pathname)
+#### f.middleware(options OR namespace)
 
 Returns a Connect middleware.
 
-For now the only option is the pathname to match with req.url (defaults to `/wrapped.js`)
+For now the only option is the namespace to match with req.url (defaults to `wrapped`)
 
 ### Inspirations
 
-express-expose, browserify, brequire
+component, express-expose, browserify, brequire
 
 ### Credits
 
