@@ -2,13 +2,14 @@
   "author": "George Stagas <gstagas@gmail.com> (http://stagas.com)",
   "name": "frequire",
   "description": "Just f**ing require modules and share code with the browser",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "./frequire.js",
   "dependencies": {
     "tosource": "~0.1.1"
   },
   "devDependencies": {
-    "express": "~3.0.0rc2"
+    "express": "~3.0.0rc2",
+    "jade": "~0.27.2"
   },
   "optionalDependencies": {},
   "engines": {

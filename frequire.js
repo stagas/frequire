@@ -94,10 +94,7 @@ module.exports = function (_require, skipPackageJson) {
     }
 
   , expose: function (name, thing) {
-      if ('function' === typeof name) {
-        wrapped += '\n;(' + name + ')();\n'
-      }
-      else wrapped += '\nwindow["' + name + '"] = ' + toSource(thing) + ';\n'
+      wrapped += __expose(name, thing)
       return this
     }
 
@@ -115,10 +112,25 @@ module.exports = function (_require, skipPackageJson) {
           res.end(styles)
           return
         }
-        else next()
+        else {
+          res.expose = function (name, thing) {
+            res.locals.exposed = res.locals.exposed || ''
+            res.locals.exposed += __expose(name, thing)
+          }
+          next()
+        }
       }
     }
   }
+}
+
+function __expose (name, thing) {
+  var s
+  if ('function' === typeof name) {
+    s = '\n;(' + name + ')();\n'
+  }
+  else s = '\nwindow["' + name + '"] = ' + toSource(thing) + ';\n'
+  return s
 }
 
 function read (filename) {

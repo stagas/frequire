@@ -7,7 +7,12 @@ f.require([ 'emitter', 'jquery', 'tip', 'client' ])
 
 f.expose(function () { require('client').start() })
 
+app.set('view engine', 'jade')
 app.use(f.middleware())
-app.use(express.static(__dirname + '/public'))
+
+app.get('/', function (req, res) {
+  res.expose('foo', { some: 'value' })
+  res.render('index')
+})
 
 app.listen(8080)
