@@ -2,7 +2,7 @@
   "author": "George Stagas <gstagas@gmail.com> (http://stagas.com)",
   "name": "frequire",
   "description": "Just f**ing require modules and share code with the browser",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "./frequire.js",
   "dependencies": {
     "tosource": "~0.1.1"
