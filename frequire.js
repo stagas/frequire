@@ -24,8 +24,15 @@ module.exports = function (_require, skipPackageJson) {
       var registryName = name
       resolver = resolver || _require.resolve
 
-      // passing path
-      if ('string' === typeof thing) name = thing
+      if ('string' === typeof thing) {
+        // passing path
+        if (!~thing.indexOf(' ')) name = thing
+        else {
+          // pass code string
+          wrapped += wrap(name, thing)
+          return this
+        }
+      }
 
       // passing code
       else if (null != thing) {
@@ -41,8 +48,7 @@ module.exports = function (_require, skipPackageJson) {
         if (isComponent && ~args[1].indexOf('component-')) {
           throw e
         }
-        args[1] = args[1] || args[0]
-        args[1] = args[1] + (isComponent ? 'component-' : '-component')
+        args[1] = isComponent ? 'component-' + args[0] : args[0] + '-component'
         return __require.apply(this, args)
       }
 
