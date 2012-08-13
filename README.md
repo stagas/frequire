@@ -9,7 +9,7 @@ Just f**ing require modules and components and share code with the browser.
 #### server:
 
 ```javascript
-var f = require('frequire')(require)
+var f = require('frequire')(__dirname)
 f.require([ 'jquery', 'client' ])
 f.expose(function () { require('client').start() })
 app.use(f.middleware())
