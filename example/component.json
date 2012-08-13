@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "component/emitter": "*",
+    "component/jquery": "*",
+    "component/tip": "*"
+  }
+}

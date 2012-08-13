@@ -1,9 +1,10 @@
 var express = require('express')
 var app = express()
 
-var f = require('../frequire')(require)
+var f = require('../frequire')(__dirname)
 
 f.require([ 'emitter', 'jquery', 'tip', 'client' ])
+f.require('relative', './relative.js')
 
 f.expose(function () { require('client').start() })
 

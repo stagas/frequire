@@ -48,8 +48,10 @@ require.exists = function(path){
 require.resolve = function(path){
   var orig = path
     , reg = path + '.js'
+    , json = path + '.json'
     , index = path + '/index.js';
   return require.modules[reg] && reg
+    || require.modules[json] && json
     || require.modules[index] && index
     || orig;
 };
@@ -94,7 +96,7 @@ require.relative = function(parent) {
     var path = parent.split('/')
       , segs = p.split('/');
 
-    if ('.' == path[0][0]) path.pop();
+    if ('.' == path[0][0] || 'index.js' === path[path.length - 1]) path.pop();
 
     for (var i = 0; i < segs.length; i++) {
       var seg = segs[i];

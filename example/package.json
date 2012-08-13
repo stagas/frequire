@@ -1,9 +1,9 @@
 {
   "author": "",
-  "name": "client",
+  "name": "example",
   "version": "0.0.0",
-  "dependencies": {},
-  "files": [ "config.json", "greet.js" ],
+  "private": true,
+  "dependencies": { "client": "*" },
   "devDependencies": {},
   "optionalDependencies": {},
   "engines": {
