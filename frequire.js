@@ -6,6 +6,7 @@ var dirname = path.dirname
 var basename = path.basename
 var join = path.join
 var normalize = path.normalize
+var resolve = path.resolve
 var toSource = require('tosource')
 
 var requireManager = read(__dirname + '/require.js')
@@ -55,7 +56,10 @@ function makeRequire (moduleName, thing) {
   var args = [].slice.call(arguments)
   var registryName = moduleName
 
-  function process (filename, isGlobal) {
+  function process (obj, isGlobal) {
+    obj = obj || { filename: obj, registryName: obj }
+    var filename = obj.filename
+    var registryName = obj.registryName
     var ext = extname(filename)
     var base = basename(filename)
     var isRoot = base === 'index.js' || basename(filename, ext) === registryName
@@ -77,7 +81,7 @@ function makeRequire (moduleName, thing) {
       self.css += '/* stylesheet: ' + base + ' */\n\n' + file + '\n\n'
     }
     else {
-      self.js += wrap(isGlobal === true ? base : registryName + '/' + base, file)
+      self.js += wrap(isGlobal === true ? base : registryName, file)
     }
   }
 
@@ -93,7 +97,7 @@ function makeRequire (moduleName, thing) {
       else if (exists(filenamejson)) filename = filenamejson
       else throw new Error('file not found: ' + thing)
 
-      process(filename, true)
+      process({ filename: filename, registryName: registryName }, true)
 
       return this
     }
@@ -133,6 +137,10 @@ function parseRead (filename) {
   return parsed
 }
 
+function slashes (s) {
+  return s.replace(/\\/g, '/')
+}
+
 module.exports = function (dir) {
   var root = top(dir, 'package.json')
 
@@ -141,9 +149,9 @@ module.exports = function (dir) {
 
   var paths = {}
 
-  function add (key, file) {
+  function add (key, file, registryName) {
     paths[key] = paths[key] || []
-    paths[key].push(file)
+    paths[key].push({ filename: file, registryName: slashes(registryName) })
   }
 
   if (pkg) {
@@ -154,7 +162,7 @@ module.exports = function (dir) {
       files.forEach(function (file) {
         var ext = extname(file)
         if (!ext) file = file + '.js'
-        add(key, join(root, 'node_modules', key, file))
+        add(key, join(root, 'node_modules', key, file), join(key, file))
       })
     })
   }
@@ -167,7 +175,7 @@ module.exports = function (dir) {
       var files = json.scripts || [ 'index.js' ]
       files = files.concat(json.styles || [])
       files.forEach(function (file) {
-        add(name, join(root, 'components', dir, file))
+        add(name, join(root, 'components', dir, file), join(name, file))
       })
     })
   }
