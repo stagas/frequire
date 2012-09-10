@@ -1,0 +1,56 @@
+#!/usr/bin/env node
+
+var fs = require('fs')
+var args = process.argv.slice(2)
+var arg
+var path
+var mods = []
+var cwd = process.cwd()
+
+var out = cwd + '/build.js'
+while (arg = args.shift()) {
+  if (arg == '-h' || arg == '--help') {
+    help()
+    process.exit()
+  }
+  else if (arg == '-o' || arg == '--output') {
+    out = arg.shift()
+  }
+  else if (!path) {
+    path = arg
+  }
+  else {
+    mods.push(arg)
+  }
+}
+
+if (!path) path = cwd
+
+var css = out.split('.').slice(0, -1) + '.css'
+
+console.log('searching path: %s', path)
+
+var f = require('../frequire')(path)
+
+console.log('\nbuilding package "%s"', f.modules.__name__)
+
+if (mods.length) {
+  mods.forEach(function (mod) {
+    f.require(mod)
+  })
+}
+else {
+  f.require('.')
+}
+
+fs.writeFileSync(out, f.clientRequire + f.js)
+fs.writeFileSync(css, f.css)
+
+console.log('\ndone')
+console.log('\nbuild files:')
+console.log('js: %s', out)
+console.log('css: %s', css)
+
+function help () {
+  console.log('\nusage: frequire [path] [module, [...]] [--output filename]\n')
+}

@@ -159,6 +159,7 @@ function readdir (dirname, arr, excluded) {
 
 /**
  * Move dirs up until it finds filename
+ * 
  * @param  {String} location
  * @param  {String} filename
  * @return {String} location
@@ -269,7 +270,12 @@ function make (dep, thing, parent) {
 
       if (filename) {
         make.call(self, filename, null, parent)
-        self.alias(join(pop(mods[filename].paths[0]), mods[filename].name, mods[filename].main), dep)
+        if (mods[filename].name == mods.__name__) {
+          self.alias(join(mods[filename].paths[0], mods[filename].main), '.')
+        }
+        else {
+          self.alias(join(pop(mods[filename].paths[0]), mods[filename].name, mods[filename].main), dep)
+        }
         return this
       }
 
@@ -408,12 +414,13 @@ function index (dir, parent, mods, root) {
     var ext = extname(main)
     if (!ext) main = main + '.js'
     if ('./' == main.substr(0, 2)) main = main.substr(2)
-    files.push(join(modulePath, main))
+    var mainfile = join(modulePath, main)
+    if (exists(mainfile)) files.push(join(modulePath, main))
     files = files.concat(
       readdir(
         modulePath
       , null
-      , [ 'node_modules', 'components', 'example', 'examples', 'test', 'bin', 'bench' ]
+      , [ 'node_modules', 'components', 'example', 'examples', 'test', 'bin', 'bench', 'build', 'build.js', 'build.css' ]
       )
     )
     unique(files
@@ -441,11 +448,11 @@ function index (dir, parent, mods, root) {
       }
 
       each(json.dependencies, function (val, key) {
-        var modulePath, found = false
+        var modulePath, found = false, d = dir
         while (!found) {
-          modulePath = join(dir, style.path, style.pre ? style.pre(key) : key)
+          modulePath = join(d, style.path, style.pre ? style.pre(key) : key)
           if (exists(modulePath)) found = true
-          else if (dir.length) dir = pop(dir)
+          else if (d.length) d = pop(d)
           else if (~key.indexOf(Object.keys(json.optionalDependencies || {}))) { return }
           else throw new Error('Module not found ' + key + ' in ' + json.name)
         }
@@ -465,7 +472,7 @@ function index (dir, parent, mods, root) {
  */
 
 var frequire = module.exports = function (dir) {
-  var root = top(dir, 'package.json')
+  var root = top(resolve(dir), 'package.json')
 
   var mods = index(root)
 
@@ -478,6 +485,7 @@ var frequire = module.exports = function (dir) {
   , js: ''
   , css: ''
   , registered: []
+  , aliased: []
   , root: root
   , modules: mods
 
@@ -530,6 +538,8 @@ var frequire = module.exports = function (dir) {
      */
 
   , alias: function (from, to) {
+      if (~this.aliased.indexOf(from + '::' + to)) return
+      this.aliased.push(from + '::' + to)
       this.js += '\nrequire.alias(' + JSON.stringify(from) + ',' + JSON.stringify(to) + ');\n'
     }
 
@@ -567,6 +577,8 @@ var frequire = module.exports = function (dir) {
       var version = parts[1] || '*'
 
       if (dep in mods) return dep
+
+      if ('.' == dep || './' == dep) return this.resolve(mods.__name__)
 
       if (~name.indexOf('/')) {
         name = name.split('/')

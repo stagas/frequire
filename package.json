@@ -15,8 +15,9 @@
     "compile",
     "middleware"
   ],
-  "version": "0.1.0beta2",
+  "version": "0.1.0beta3",
   "main": "frequire.js",
+  "bin": { "fbuild": "./bin/fbuild" },
   "dependencies": {
     "tosource": "~0.1.1",
     "semver": "~1.0.14",
