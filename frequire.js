@@ -488,7 +488,7 @@ var frequire = module.exports = function (dir) {
      */
 
   , shim: function (what) {
-      var f = frequire(join(__dirname, 'shims', what))
+      var f = frequire(__dirname)
       f.require(what + '-shim')
       f.expose("require('" + what + "-shim')();")
       return f

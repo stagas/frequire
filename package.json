@@ -15,11 +15,12 @@
     "compile",
     "middleware"
   ],
-  "version": "0.1.0beta1",
-  "main": "./frequire.js",
+  "version": "0.1.0beta2",
+  "main": "frequire.js",
   "dependencies": {
     "tosource": "~0.1.1",
-    "semver": "~1.0.14"
+    "semver": "~1.0.14",
+    "node-shim": "0.0.1"
   },
   "devDependencies": {},
   "optionalDependencies": {},
