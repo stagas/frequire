@@ -1,4 +1,3 @@
-
 /**
  * Require the given path.
  *
@@ -7,79 +6,152 @@
  * @api public
  */
 
-function require(p, parent){
-  var path = require.resolve(p)
-    , mod = require.modules[path];
-  if (!mod) throw new Error('failed to require "' + p + '" in ' + (parent || 'root'));
-  if (!mod.exports) {
-    mod.exports = {};
-    mod.client = true;
-    mod.call(mod.exports, mod, mod.exports, require.relative(path));
+function require(p, parent, orig){
+  var path = require.resolve(p, parent)
+  var fn = require.modules[path]
+
+  // lookup failed
+  if (null == path) {
+    orig = orig || p
+    parent = parent || 'root'
+    throw new Error('failed to require "' + orig + '" from "' + parent + '"')
   }
-  return mod.exports;
+
+  // perform real require()
+  // by invoking the module's
+  // registered function
+  var mod = fn.module = fn.module || {}
+  if (!mod.exports) {
+    mod.exports = {}
+    mod.client = mod.component = true
+    fn.call(mod.exports, mod, mod.exports, require.relative(path))
+  }
+
+  return mod.exports
 }
 
 /**
  * Registered modules.
  */
 
-require.modules = {};
+require.modules = {}
 
 /**
- * Check if a module defined at `path` exists.
- *
- * @param {String} path
- * @return {Boolean}
- * @api public
+ * Aliases.
  */
 
-require.exists = function(path){
-  return !! require.modules[require.resolve(path)];
-};
+require.aliases = {}
 
 /**
  * Resolve `path`.
  *
+ * Lookup:
+ *
+ *   - PATH/index.js
+ *   - PATH.js
+ *   - PATH
+ *
  * @param {String} path
- * @return {Object} module
- * @api public
+ * @return {String} path or null
+ * @api private
  */
 
-require.resolve = function(path){
-  var orig = path
-    , reg = path + '.js'
-    , json = path + '.json'
-    , index = path + '/index.js';
-  return require.modules[reg] && reg
-    || require.modules[json] && json
-    || require.modules[index] && index
-    || orig;
-};
+require.resolve = function(path, parent){
+  var prefixes = ['node_modules/', 'components/', 'deps/']
+  var suffixes = ['.js', '.json', '/index.js', '/index.json']
+  
+  if (parent) {
+    parent = parent.split('/')
+    parent.pop()
+    parent = parent.join('/')
+    path = require.normalize(parent, path)    
+  }
+
+  var mod
+
+  function check (_path) {
+    if (require.aliases[_path]) return require.aliases[_path]
+    if (require.modules[_path]) return _path
+
+    if (require.aliases[parent + '/' + _path]) return require.aliases[parent + '/' + _path]
+    if (require.modules[parent + '/' + _path]) return parent + '/' + _path
+  }
+
+  if (check(path)) return check(path)
+
+  var p
+  for (var si = 0, slen = suffixes.length; si < slen; si++) {
+    p = path + suffixes[si]
+    if (check(p)) return check(p)
+
+    for (var pi = 0, plen = prefixes.length; pi < plen; pi++) {
+      p = prefixes[pi] + path
+      if (check(p)) return check(p)
+
+      p = prefixes[pi] + path + suffixes[si]
+      if (check(p)) return check(p)
+    }
+  }
+
+  if (parent && parent.split('/').length) return require.resolve(path, parent)
+}
+
+/**
+ * Normalize `path` relative to the current path.
+ *
+ * @param {String} curr
+ * @param {String} path
+ * @return {String}
+ * @api private
+ */
+
+require.normalize = function(curr, path) {
+  var segs = []
+
+  if (null == path) return curr
+
+  // foo
+  if ('.' != path.charAt(0)) return path
+
+  curr = curr.split('/')
+  path = path.split('/')
+
+  for (var i = 0; i < path.length; ++i) {
+    if ('..' == path[i]) {
+      curr.pop()
+    } else if ('.' != path[i] && '' != path[i]) {
+      segs.push(path[i])
+    }
+  }
+
+  return curr.concat(segs).join('/')
+}
 
 /**
  * Register module at `path` with callback `fn`.
  *
  * @param {String} path
  * @param {Function} fn
- * @api public
+ * @api private
  */
 
 require.register = function(path, fn){
-  require.modules[path] = fn;
-};
+  require.modules[path] = fn
+}
 
 /**
- * Defines and executes anonymous module immediately, while preserving relative
- * paths.
+ * Alias a module definition.
  *
- * @param {String} path
- * @param {Function} require ref
- * @api public
+ * @param {String} from
+ * @param {String} to
+ * @api private
  */
 
-require.exec = function (path, fn) {
-  fn.call(window, require.relative(path));
-};
+require.alias = function(from, to){
+  var fn = require.modules[from]
+  if (!fn) throw new Error('failed to alias "' + from + '", it does not exist')
+  require.aliases[to] = from
+}
 
 /**
  * Return a require function relative to the `parent` path.
@@ -90,24 +162,39 @@ require.exec = function (path, fn) {
  */
 
 require.relative = function(parent) {
+
+  /**
+   * The relative require() itself.
+   */
+
   function fn(p){
-    if ('.' != p[0]) return require(p, parent);
-
-    var path = parent.split('/')
-      , segs = p.split('/');
-
-    if ('.' == path[0][0] || 'index.js' === path[path.length - 1]) path.pop();
-
-    for (var i = 0; i < segs.length; i++) {
-      var seg = segs[i];
-      if ('..' == seg) path.pop();
-      else if ('.' != seg) path.push(seg);
-    }
-
-    return require(path.join('/'), parent);
+    var path = fn.resolve(p, parent)
+    return require(path, parent, p)
   }
 
-  fn.exists = require.exists;
+  /**
+   * Resolve relative to the parent.
+   */
 
-  return fn;
-};
+  fn.resolve = function(path){
+    return require.resolve(path, parent)
+  }
+
+  /**
+   * Alias.
+   */
+
+  fn.alias = function(from, to){
+    return require.alias(from, to)
+  }
+
+  /**
+   * Check if module is defined at `path`.
+   */
+
+  fn.exists = function(path){
+    return !! require.modules[fn.resolve(path)]
+  }
+
+  return fn
+}

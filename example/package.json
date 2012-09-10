@@ -3,7 +3,13 @@
   "name": "example",
   "version": "0.0.0",
   "private": true,
-  "dependencies": { "client": "*" },
+  "dependencies": {
+    "express": "~3.0.0rc4",
+    "jade": "~0.27.2",
+    "http-browserify": "*",
+    "shoe": "0.0.7",
+    "youtube-player": "~0.1.1"
+  },
   "devDependencies": {},
   "optionalDependencies": {},
   "engines": {

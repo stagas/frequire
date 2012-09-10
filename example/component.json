@@ -1,7 +1,6 @@
 {
   "dependencies": {
-    "component/emitter": "*",
-    "component/jquery": "*",
-    "component/tip": "*"
+    "component/popover": "*",
+    "component/jquery": "*"
   }
 }

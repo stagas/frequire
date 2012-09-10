@@ -4,12 +4,55 @@ var exists = fs.existsSync || path.existsSync
 var extname = path.extname
 var dirname = path.dirname
 var basename = path.basename
-var join = path.join
-var normalize = path.normalize
 var resolve = path.resolve
+var semver = require('semver')
 var toSource = require('tosource')
+var clientRequire = read(__dirname + '/require.js')
 
-var requireManager = read(__dirname + '/require.js')
+var styles = {}
+
+styles.node = {
+  path: 'node_modules'
+, pkg: 'package.json'
+}
+
+styles.component = {
+  path: 'components'
+, pkg: 'component.json'
+, pre: function (d) {
+    d = d.replace('/', '-')
+    return d
+  }
+}
+
+/**
+ * Join path with forward slashes
+ * 
+ * @param {String} path Any number of paths
+ * @return {String} joined path
+ */
+
+function join () {
+  return slashes(path.join.apply(path, arguments))
+}
+
+/**
+ * Normalize with forward slashes
+ * 
+ * @param  {String} path
+ * @return {String} result
+ */
+
+function normalize (p) {
+  return slashes(path.normalize(p))
+}
+
+/**
+ * Run fn on each element in objects and arrays
+ *
+ * @param  {Object|Array}   object or array
+ * @param  {Function} fn
+ */
 
 function each (o, fn) {
   if (Array.isArray(o)) return o.forEach(fn)
@@ -20,20 +63,120 @@ function each (o, fn) {
   }
 }
 
+/**
+ * Split string with identifier, pop last element and join again
+ * 
+ * @param  {String} string
+ * @param  {String} identifier
+ * @return {String} result
+ */
+
+function pop (s, i) {
+  s = ('string' == typeof s ? s : '').split(i || '/')
+  s.pop()
+  return s.join(i || '/')
+}
+
+/**
+ * Convert backward to forward slashes
+ * 
+ * @param  {String} string
+ * @return {String} result
+ */
+
+function slashes (s) {
+  return s.replace(/\\/g, '/')
+}
+
+/**
+ * Return an array of only unique elements given another array
+ * @param  {Array} array
+ * @return {Array} result
+ */
+
+function unique (arr) {
+  var o = {}
+  arr.forEach(function (el) { o[el] = { type: typeof el } })
+  var newarr = []
+  for (var el in o) {
+    newarr.push(o[el].type === 'number' ? Number(el) : el)
+  }
+  return newarr
+}
+
+/**
+ * Strip from `b` a string with the length of `a`
+ * @param  {String} a
+ * @param  {String} b
+ * @return {String} result
+ */
+
+function strip (a, b) {
+  return b.substr(a.length + 1)
+}
+
+/**
+ * Read a file in sync
+ * 
+ * @param  {String} filename
+ * @return {String} file contents
+ */
+
 function read (filename) {
   return fs.readFileSync(normalize(filename), 'utf8')
 }
+
+/**
+ * Recursively read a directory contents, optionally excluding filenames
+ * 
+ * @param  {String} dirname
+ * @param  {Array} arr  Used internally to carry the result array
+ * @param  {Array} excluded
+ * @return {Array} list of file paths
+ *
+ * TODO: currently hardcoded to accept only some extensions
+ */
+
+function readdir (dirname, arr, excluded) {
+  arr = arr || []
+  try {
+    fs.readdirSync(dirname)
+      .filter(function (file) { return !~excluded.indexOf(file) && '.' != file[0] })
+      .map(function (file) { return join(dirname, file) })
+      .forEach(function (file) {
+        if (fs.statSync(file).isDirectory()) {
+          readdir(file, arr, excluded)
+        }
+        else {
+          if (~['.js','.json','.css'].indexOf(extname(file))) {
+            arr.push(file)
+          }
+        }
+      })
+  } catch (_) {}
+  return arr
+}
+
+/**
+ * Move dirs up until it finds filename
+ * @param  {String} location
+ * @param  {String} filename
+ * @return {String} location
+ */
 
 function top (location, filename) {
   var found = null
   var pathname = null
   var pkg = {}
 
+  location = slashes(location)
+  filename = slashes(filename)
+
   while (!found) {
     pathname = join(location, filename)
     if (exists(pathname)) {
       found = location
-    } else if (location !== '/' && location.substr(1) !== ':\\') {
+    } else if (location !== '/' && location.substr(1) !== ':/') {
       location = dirname(location)
     } else {
       break
@@ -43,92 +186,163 @@ function top (location, filename) {
   return found
 }
 
-function wrap (name, script) {
-  var str = '\n// package ' + name + '\n'
-  str += 'require.register("' + name + '", function(module, exports, require){\n'
+/**
+ * Wrap a filename - script pair in require.register code
+ * 
+ * @param  {String} filename
+ * @param  {String} script
+ * @return {String} code string
+ */
+
+function wrap (filename, script) {
+  var str = '\nrequire.register('
+  str += JSON.stringify(filename)
+  str += ',function(module,exports,require){\n'
   str += script + '\n'
   str += '});\n'
   return str
 }
 
-function makeRequire (moduleName, thing) {
+/**
+ * Make a require
+ * 
+ * @param  {String} dependency
+ * @param  {String} thing  One of many
+ * @param  {String} parent  This module's parent
+ * @return {Object} this
+ */
+
+function make (dep, thing, parent) {
   var self = this
-  var args = [].slice.call(arguments)
-  var registryName = moduleName
+  var root = this.root
+  var mods = this.modules
 
-  function process (obj, isGlobal) {
-    obj = obj || { filename: obj, registryName: obj }
-    var filename = obj.filename
-    var registryName = obj.registryName
-    var ext = extname(filename)
-    var base = basename(filename)
-    var isRoot = base === 'index.js' || basename(filename, ext) === registryName
+  if (dep.substr(0, 1) == '.' && !thing) {
+    return make.call(this, dep, dep)
+  }
 
-    var file = read(filename)
+  /**
+   * Actually register the module
+   * 
+   * @param  {Object} mod   a normalized module object
+   * @param  {String} name  dependency name
+   * @param  {String} alias
+   */
+
+  function process (mod, name, alias) {
+    var ext = extname(name)
+    var filename = join(mod.paths[0] || '.', name)
+
+    var script = read(join(mods.__root__, filename))
 
     // preprocess
-    if ('.js' === ext) {}
-    else if ('.css' === ext) {}
-    else if ('.json' === ext) {
-      file = 'module.exports = ' + file
+    if ('.js' == ext) {}
+    else if ('.css' == ext) {}
+    else if ('.json' == ext) {
+      script = 'module.exports = ' + script
     }
     else {
-      file = 'module.exports = "' + file.replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, '\\n') + '"'
+      script = 'module.exports = "' + script.replace(/"/g, '\\"').replace(/\r\n|\r|\n/g, '\\n') + '"'
     }
 
     // append
-    if ('.css' === ext) {
-      self.css += '/* stylesheet: ' + base + ' */\n\n' + file + '\n\n'
-    }
-    else {
-      self.js += wrap(isGlobal === true ? base : registryName, file)
+    self.register(filename, script)
+    if ('.css' != ext) {
+      if (mod.main == name) {
+        self.alias(filename, join(pop(mod.paths[0]), mod.name))
+      }
+      if (alias) {
+        self.alias(filename, alias)
+      }
+      if (mod.paths.length > 1) {
+        for (var i = 1, len = mod.paths.length; i < len; i++) {
+          self.alias(filename, join(mod.paths[i], name))
+        }
+      }
     }
   }
 
   if ('string' === typeof thing) {
     // passing path
     if (!~thing.indexOf(' ')) {
-      var filename = join(this.root, thing)
-      var filenamejs = join(this.root, thing + '.js')
-      var filenamejson = join(this.root, thing + '.json')
+      var filename = this.resolve(thing)
+
+      if (filename) {
+        make.call(self, filename, null, parent)
+        self.alias(join(pop(mods[filename].paths[0]), mods[filename].name, mods[filename].main), dep)
+        return this
+      }
+
+      filename = join(root, thing)
+      var filenamejs = join(root, thing + '.js')
+      var filenamejson = join(root, thing + '.json')
 
       if (exists(filename)) {}
       else if (exists(filenamejs)) filename = filenamejs
       else if (exists(filenamejson)) filename = filenamejson
       else throw new Error('file not found: ' + thing)
 
-      process({ filename: filename, registryName: registryName }, true)
+      process(mods[this.resolve(mods.__name__)], strip(root, filename), dep)
 
       return this
     }
     else {
       // pass code string
-      this.js += wrap(moduleName, thing)
+      this.register(dep, thing)
       return this
     }
   }
 
   // passing code
   else if (null != thing) {
-    this.js += wrap(moduleName, 'module.exports = ' + toSource(thing))
+    this.register(dep, 'module.exports = ' + toSource(thing))
     return this
   }
 
-  var files = this.paths[moduleName]
+  var p = this.resolve(dep)
+  if (!p) throw new Error('cannot resolve ' + (parent && parent.name) + ' ' + dep)
+  
+  var mod = mods[p]
 
-  files.forEach(process)
+  if (mod.files.length) mod.files.forEach(function (file) {
+    process(mod, file)
+  })
+
+  if (mod.deps.length) {
+    mod.deps.forEach(function (dep) {
+      make.call(self, dep, null, mod)
+    })
+  }
 
   return this
 }
 
-function makeExpose (name, thing) {
+/**
+ * Generate exposed code
+ * 
+ * @param  {Mixed} name
+ * @param  {Mixed} thing
+ * @return {String} code
+ */
+
+function expose (name, thing) {
   var s
-  if ('function' === typeof name) {
+  if ('function' == typeof name) {
     s = '\n;(' + name + ')();\n'
   }
-  else s = '\nwindow["' + name + '"] = ' + toSource(thing) + ';\n'
+  else if ('undefined' != typeof thing) {
+    s = '\nwindow["' + name + '"] = ' + toSource(thing) + ';\n'
+  }
+  else s = '\n;' + name + ';\n'
   return s
 }
+
+/**
+ * Read and JSON.parse a file
+ * 
+ * @param  {String} filename
+ * @return {Mixed} result
+ */
 
 function parseRead (filename) {
   var parsed
@@ -137,54 +351,194 @@ function parseRead (filename) {
   return parsed
 }
 
-function slashes (s) {
-  return s.replace(/\\/g, '/')
+/**
+ * Generate an index of modules on a given dir
+ * 
+ * @param  {String} dir    
+ * @param  {String} parent 
+ * @param  {String} mods   (internal)
+ * @param  {String} root   (internal)
+ * @return {Object} modules index
+ */
+
+function index (dir, parent, mods, root) {
+  dir = slashes(resolve(dir))
+  root = root || ''
+  mods = mods || {}
+
+  function add (json, main, filename, modulePath, style) {
+    if (!json.name) json.name = mods.__name__
+
+    var key = json.name + '@' + (json.version || '0.0.0')
+
+    mods[key] = mods[key] || {
+      name: json.name
+    , main: main
+    , version: json.version
+    , paths: []
+    , deps: []
+    , files: []
+    }
+
+    mods[key].deps = unique(
+      mods[key].deps.concat(
+        Object.keys(json.dependencies || {})
+          .filter(function (key) {
+            return !~Object.keys(json.optionalDependencies || {}).indexOf(key)
+          })
+          .map(function (key) {
+            return key + '@' + json.dependencies[key]
+          })
+      )
+    )
+
+    var modPath = !root ? '' : strip(root, modulePath)
+    if (modPath && !~mods[key].paths.indexOf(modPath)) mods[key].paths.push(modPath)
+
+    var reg = strip(modulePath, filename)
+    if (!~mods[key].files.indexOf(reg)) mods[key].files.push(reg)
+  }
+
+  function readJson (style, modulePath) {
+    var json = parseRead(join(modulePath, style.pkg))
+    if (!json) return
+
+    var files = json.files || []
+    var main = json.browserify || json.main || 'index.js'
+    var ext = extname(main)
+    if (!ext) main = main + '.js'
+    if ('./' == main.substr(0, 2)) main = main.substr(2)
+    files.push(join(modulePath, main))
+    files = files.concat(
+      readdir(
+        modulePath
+      , null
+      , [ 'node_modules', 'components', 'example', 'examples', 'test', 'bin', 'bench' ]
+      )
+    )
+    unique(files
+      .map(function (filename) {
+        var ext = extname(filename)
+        if (!ext) filename = filename + '.js'
+        if ('./' == filename.substr(0, 2)) filename = filename.substr(2)
+        return filename
+      }))
+      .forEach(function (filename) {
+        add(json, main, filename, modulePath, style)
+      })
+    return json
+  }
+
+  each(styles, function (style) {
+    var json = readJson(style, dir)
+
+    if (json) {
+      if (!root) {
+        root = dir
+        mods.__root__ = slashes(dir)
+        mods.__name__ = json.name
+        mods.__version__ = json.version
+      }
+
+      each(json.dependencies, function (val, key) {
+        var modulePath, found = false
+        while (!found) {
+          modulePath = join(dir, style.path, style.pre ? style.pre(key) : key)
+          if (exists(modulePath)) found = true
+          else if (dir.length) dir = pop(dir)
+          else if (~key.indexOf(Object.keys(json.optionalDependencies || {}))) { return }
+          else throw new Error('Module not found ' + key + ' in ' + json.name)
+        }
+        index(modulePath, join(key, style.path), mods, root)
+      })
+    }
+  })
+
+  return mods
 }
 
-module.exports = function (dir) {
+/**
+ * Generate a setup context
+ * 
+ * @param  {String} root dir
+ * @return {Object} api
+ */
+
+var frequire = module.exports = function (dir) {
   var root = top(dir, 'package.json')
 
-  var pkg = parseRead(join(root, 'package.json'))
-  var comp = parseRead(join(root, 'component.json'))
+  var mods = index(root)
 
-  var paths = {}
-
-  function add (key, file, registryName) {
-    paths[key] = paths[key] || []
-    paths[key].push({ filename: file, registryName: slashes(registryName) })
-  }
-
-  if (pkg) {
-    each(pkg.dependencies, function (val, key) {
-      var json = parseRead(join(root, 'node_modules', key, 'package.json'))
-      var files = json.files || []
-      files.push(json.main || 'index.js')
-      files.forEach(function (file) {
-        var ext = extname(file)
-        if (!ext) file = file + '.js'
-        add(key, join(root, 'node_modules', key, file), join(key, file))
-      })
-    })
-  }
-
-  if (comp) {
-    each(comp.dependencies, function (val, key) {
-      var dir = key.replace('/', '-')
-      var name = key.split('/')[1]
-      var json = parseRead(join(root, 'components', dir, 'component.json'))
-      var files = json.scripts || [ 'index.js' ]
-      files = files.concat(json.styles || [])
-      files.forEach(function (file) {
-        add(name, join(root, 'components', dir, file), join(name, file))
-      })
-    })
-  }
+  /**
+   * public api
+   */
 
   return {
-    js: requireManager
+    clientRequire: clientRequire
+  , js: ''
   , css: ''
+  , registered: []
   , root: root
-  , paths: paths
+  , modules: mods
+
+    /**
+     * Create an frequire shim
+     * 
+     * @return {Object} frequire bundle
+     */
+
+  , shim: function (what) {
+      var f = frequire(join(__dirname, 'shims', what))
+      f.require(what + '-shim')
+      f.expose("require('" + what + "-shim')();")
+      return f
+    }
+
+    /**
+     * Shortcut for node shim
+     * 
+     * @return {Object} frequire bundle
+     */
+
+  , node: function () { return this.shim('node') }
+
+    /**
+     * Register a filename - script pair
+     * 
+     * @param  {String} filename 
+     * @param  {String} script   
+     */
+
+  , register: function (filename, script) {
+      if (~this.registered.indexOf(filename)) return
+      this.registered.push(filename)
+
+      var ext = extname(filename)
+      if ('.css' == ext) {
+        this.css = '/* stylesheet: ' + filename + ' */\n\n' + script + '\n\n' + this.css
+      }
+      else {
+        this.js += wrap(filename, script)
+      }
+    }
+
+    /**
+     * Register an alias
+     * 
+     * @param  {String} from 
+     * @param  {String} to   
+     */
+
+  , alias: function (from, to) {
+      this.js += '\nrequire.alias(' + JSON.stringify(from) + ',' + JSON.stringify(to) + ');\n'
+    }
+
+    /**
+     * Require deps
+     * 
+     * @param  {String} name 
+     */
+
   , require: function (name) {
       var self = this
 
@@ -196,14 +550,61 @@ module.exports = function (dir) {
         return this
       }
 
-      makeRequire.apply(this, arguments)
+      make.apply(this, arguments)
     }
 
+    /**
+     * Resolve a dep
+     * 
+     * @param  {String} dep
+     * @return {String} resolved
+     */
+
+  , resolve: function (dep) {
+      var parts = dep.split('@')
+      var mods = this.modules
+      var name = parts[0]
+      var version = parts[1] || '*'
+
+      if (dep in mods) return dep
+
+      if (~name.indexOf('/')) {
+        name = name.split('/')
+        name.shift()
+        name = name.join('/')
+      }
+
+      for (var k in mods) {
+        parts = k.split('@')
+        if (name == parts[0] && semver.satisfies(parts[1], version)) return k
+      }
+
+      for (var k in mods) {
+        parts = k.split('@')
+        if (name == parts[0]) return k
+      }
+    }
+
+    /**
+     * Make an expose
+     * 
+     * @param  {String} name  [description]
+     * @param  {String} thing [description]
+     * @return {Object} this
+     */
+
   , expose: function (name, thing) {
-      this.js += makeExpose(name, thing)
+      this.js += expose(name, thing)
       return this
     }
 
+    /**
+     * Returns a Connect/Express middleware
+     * 
+     * @param  {Object} opts
+     * @return {Function} middleware fn
+     */
+    
   , middleware: function (opts) {
       var self = this
 
@@ -212,7 +613,7 @@ module.exports = function (dir) {
       return function (req, res, next) {
         if (req.url === '/' + opts.name + '.js') {
           res.setHeader('content-type', 'application/javascript')
-          res.end(self.js)
+          res.end(self.clientRequire + self.js)
           return
         }
         else if (req.url === '/' + opts.name + '.css') {
@@ -223,7 +624,7 @@ module.exports = function (dir) {
         else {
           res.expose = function (name, thing) {
             res.locals.exposed = res.locals.exposed || ''
-            res.locals.exposed += makeExpose(name, thing)
+            res.locals.exposed += expose(name, thing)
           }
           next()
         }

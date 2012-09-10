@@ -1,17 +1,27 @@
 {
-  "author": "George Stagas <gstagas@gmail.com> (http://stagas.com)",
+  "author": {
+    "name": "George Stagas",
+    "email": "gstagas@gmail.com",
+    "url": "http://stagas.com"
+  },
   "name": "frequire",
-  "description": "Just f**ing require modules and share code with the browser",
-  "keywords": ["require", "component", "expose", "build", "compile", "middleware"],
-  "version": "0.1.0alpha2",
+  "description": "require() for the browser - works with npm modules, browserify modules, components, expose objects and more",
+  "keywords": [
+    "require",
+    "component",
+    "expose",
+    "browserify",
+    "build",
+    "compile",
+    "middleware"
+  ],
+  "version": "0.1.0beta1",
   "main": "./frequire.js",
   "dependencies": {
-    "tosource": "~0.1.1"
+    "tosource": "~0.1.1",
+    "semver": "~1.0.14"
   },
-  "devDependencies": {
-    "express": "~3.0.0rc2",
-    "jade": "~0.27.2"
-  },
+  "devDependencies": {},
   "optionalDependencies": {},
   "engines": {
     "node": "*"
