@@ -584,8 +584,7 @@ var frequire = module.exports = function (dir) {
       }
 
       for (var k in mods) {
-        parts = k.split('@')
-        if (name == mods[k].name) return k
+        if (name == k.split('@')[0] || name == mods[k].name) return k
       }
     }
 
