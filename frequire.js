@@ -146,7 +146,7 @@ function readdir (dirname, arr, excluded) {
           readdir(file, arr, excluded)
         }
         else {
-          if (~['.js','.json','.css'].indexOf(extname(file))) {
+          if (~['.js','.json','.html','.css'].indexOf(extname(file))) {
             arr.push(file)
           }
         }
