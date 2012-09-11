@@ -47,9 +47,9 @@ fs.writeFileSync(out, f.clientRequire + f.js)
 fs.writeFileSync(css, f.css)
 
 console.log('\ndone')
-console.log('\nbuild files:')
-console.log('js: %s', out)
-console.log('css: %s', css)
+console.log('\nbuilt files:')
+console.log('  js: %s', out)
+console.log(' css: %s', css)
 
 function help () {
   console.log('\nusage: frequire [path] [module, [...]] [--output filename]\n')

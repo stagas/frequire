@@ -27,6 +27,8 @@ f.require('yo', { run: function () { alert('yo', config.name) } }) // expose an 
 
 f.expose('require("yo").run()') // expose raw code
 
+//require('fs').writeFileSync('mods.json', JSON.stringify(f.modules, null, '  '))
+
 app.use(f.middleware())
 
 // routes

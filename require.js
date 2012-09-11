@@ -61,9 +61,7 @@ require.resolve = function(path, parent){
   var suffixes = ['.js', '.json', '/index.js', '/index.json']
   
   if (parent) {
-    parent = parent.split('/')
-    parent.pop()
-    parent = parent.join('/')
+    parent = parent.split('/').slice(0, -1).join('/')
     path = require.normalize(parent, path)    
   }
 

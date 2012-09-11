@@ -72,9 +72,7 @@ function each (o, fn) {
  */
 
 function pop (s, i) {
-  s = ('string' == typeof s ? s : '').split(i || '/')
-  s.pop()
-  return s.join(i || '/')
+  return ('string' == typeof s ? s : '').split(i || '/').slice(0, -1).join(i || '/')
 }
 
 /**
@@ -375,7 +373,7 @@ function index (dir, parent, mods, root) {
   function add (json, main, filename, modulePath, style) {
     if (!json.name) json.name = mods.__name__
 
-    var key = json.name + '@' + (json.version || '0.0.0')
+    var key = modulePath.split('/').pop() + '@' + (json.version || '0.0.0')
 
     mods[key] = mods[key] || {
       name: json.name
@@ -473,7 +471,6 @@ function index (dir, parent, mods, root) {
 
 var frequire = module.exports = function (dir) {
   var root = top(resolve(dir), 'package.json')
-
   var mods = index(root)
 
   /**
@@ -580,20 +577,15 @@ var frequire = module.exports = function (dir) {
 
       if ('.' == dep || './' == dep) return this.resolve(mods.__name__)
 
-      if (~name.indexOf('/')) {
-        name = name.split('/')
-        name.shift()
-        name = name.join('/')
+      if (~name.indexOf('/')) name = name.replace('/', '-')
+
+      for (var k in mods) {
+        if ((name == k.split('@')[0] || name == mods[k].name) && semver.satisfies(mods[k].version, version)) return k
       }
 
       for (var k in mods) {
         parts = k.split('@')
-        if (name == parts[0] && semver.satisfies(parts[1], version)) return k
-      }
-
-      for (var k in mods) {
-        parts = k.split('@')
-        if (name == parts[0]) return k
+        if (name == mods[k].name) return k
       }
     }
 
