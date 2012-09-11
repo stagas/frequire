@@ -15,7 +15,7 @@
     "compile",
     "middleware"
   ],
-  "version": "0.1.0beta4",
+  "version": "0.1.0beta5",
   "main": "frequire.js",
   "bin": { "fbuild": "./bin/fbuild" },
   "dependencies": {
