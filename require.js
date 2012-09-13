@@ -59,11 +59,9 @@ require.aliases = {}
 require.resolve = function(path, parent){
   var prefixes = ['node_modules/', 'components/', 'deps/']
   var suffixes = ['.js', '.json', '/index.js', '/index.json']
-  
-  if (parent) {
-    parent = parent.split('/').slice(0, -1).join('/')
-    path = require.normalize(parent, path)    
-  }
+
+  parent = parent ? parent.split('/').slice(0, -1).join('/') : ''
+  path = require.normalize(parent, path)    
 
   var mod
 

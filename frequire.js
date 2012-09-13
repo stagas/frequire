@@ -110,7 +110,7 @@ function unique (arr) {
  */
 
 function strip (a, b) {
-  return b.substr(a.length + 1)
+  return b.substr(a.length)
 }
 
 /**
@@ -286,7 +286,7 @@ function make (dep, thing, parent) {
       else if (exists(filenamejson)) filename = filenamejson
       else throw new Error('file not found: ' + thing)
 
-      process(mods[this.resolve(mods.__name__)], strip(root, filename), dep)
+      process(mods[this.resolve(mods.__name__)], strip(root + '/', filename), dep)
 
       return this
     }
@@ -396,10 +396,10 @@ function index (dir, parent, mods, root) {
       )
     )
 
-    var modPath = !root ? '' : strip(root, modulePath)
+    var modPath = !root ? '/' : strip(root, modulePath)
     if (modPath && !~mods[key].paths.indexOf(modPath)) mods[key].paths.push(modPath)
 
-    var reg = strip(modulePath, filename)
+    var reg = strip(modulePath + '/', filename)
     if (!~mods[key].files.indexOf(reg)) mods[key].files.push(reg)
   }
 
