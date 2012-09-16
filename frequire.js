@@ -445,6 +445,16 @@ function index (dir, parent, mods, root) {
         mods.__version__ = json.version
       }
 
+      // include bundled (component.json)
+      each(json.bundled, function (val) {
+        json.dependencies[val.replace('-', '/')] = '*'
+      })
+
+      // include bundled (package.json)
+      each(json.bundledDependencies, function (val, key) {
+        json.dependencies[val] = key
+      })
+
       each(json.dependencies, function (val, key) {
         var modulePath, found = false, d = dir
         while (!found) {
