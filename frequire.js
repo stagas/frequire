@@ -12,12 +12,12 @@ var clientRequire = read(__dirname + '/require.js')
 var styles = {}
 
 styles.node = {
-  path: 'node_modules'
+  paths: ['node_modules']
 , pkg: 'package.json'
 }
 
 styles.component = {
-  path: 'components'
+  paths: ['components']
 , pkg: 'component.json'
 , pre: function (d) {
     d = d.replace('/', '-')
@@ -446,7 +446,7 @@ function index (dir, parent, mods, root) {
       }
 
       // include bundled (component.json)
-      each(json.bundled, function (val) {
+      each(json.bundled || json.local, function (val) {
         json.dependencies[val.replace('-', '/')] = '*'
       })
 
@@ -456,15 +456,21 @@ function index (dir, parent, mods, root) {
       })
 
       each(json.dependencies, function (val, key) {
-        var modulePath, found = false, d = dir
+        var modulePath, found = false, paths = style.paths.concat(json.paths || []), d = dir
         while (!found) {
-          modulePath = join(d, style.path, style.pre ? style.pre(key) : key)
-          if (exists(modulePath)) found = true
+          for (var i=paths.length;i--;) {
+            modulePath = join(d, paths[i], style.pre ? style.pre(key) : key)
+            if (exists(modulePath)) {
+              found = paths[i]
+              break
+            }
+          }
+          if (found) continue
           else if (d.length) d = pop(d)
           else if (~key.indexOf(Object.keys(json.optionalDependencies || {}))) { return }
           else throw new Error('Module not found ' + key + ' in ' + json.name)
         }
-        index(modulePath, join(key, style.path), mods, root)
+        index(modulePath, join(key, found), mods, root)
       })
     }
   })
