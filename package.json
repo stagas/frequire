@@ -20,7 +20,7 @@
   "bin": { "fbuild": "./bin/fbuild" },
   "dependencies": {
     "tosource": "~0.1.1",
-    "semver": "~1.0.14",
+    "semver": "~6.3.0",
     "node-shim": "0.0.1"
   },
   "devDependencies": {},
